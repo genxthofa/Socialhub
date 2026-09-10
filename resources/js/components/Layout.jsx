@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { 
   useAuthStore, useThemeStore, useUIStore, useNotificationsStore,
-  usePostsStore, useSocialAccountsStore, useCampaignsStore, useAnalyticsStore, useMediaStore, useAdminStore
+  usePostsStore, useSocialAccountsStore, useCampaignsStore, useAnalyticsStore, useMediaStore
 } from '../store'
 import { toast } from 'react-hot-toast'
 import { Avatar, IconButton, Badge } from './ui'
@@ -93,24 +93,6 @@ export function Sidebar() {
             ))}
           </div>
         ))}
-
-        {/* Admin link */}
-        {(user?.role === 'admin' || !user) && (
-          <div>
-            <div className="sidebar-section-label">Admin</div>
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => clsx('sidebar-nav-item', isActive && 'active')}
-            >
-              <span className="nav-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-              </span>
-              <span className="nav-label">Admin Panel</span>
-            </NavLink>
-          </div>
-        )}
       </nav>
 
       {/* Footer */}
@@ -158,7 +140,6 @@ export function Topbar({ title, actions }) {
   const { fetchCampaigns } = useCampaignsStore()
   const { fetchAnalytics } = useAnalyticsStore()
   const { fetchMedia } = useMediaStore()
-  const { fetchUsers } = useAdminStore()
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -170,7 +151,6 @@ export function Topbar({ title, actions }) {
         fetchAnalytics(),
         fetchNotifications(),
         fetchMedia(),
-        fetchUsers(),
       ])
     } catch (e) {
     } finally {
@@ -198,10 +178,8 @@ export function Topbar({ title, actions }) {
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', fontWeight: 500, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span>SocialHub</span>
-          <span style={{ opacity: 0.5 }}>›</span>
-          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{title}</span>
+        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', fontWeight: 500, marginBottom: 2 }}>
+          SocialHub
         </div>
         <h1 className="topbar-title">{title}</h1>
       </div>
@@ -307,7 +285,6 @@ export function Topbar({ title, actions }) {
                 </div>
                 {[
                   { label: 'Profile & Settings', to: '/settings' },
-                  { label: 'Admin Panel', to: '/admin' },
                 ].map(item => (
                   <button
                     key={item.to}

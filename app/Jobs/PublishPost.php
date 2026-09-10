@@ -43,6 +43,7 @@ class PublishPost implements ShouldQueue
                 'facebook'  => $this->publishToFacebook($post, $account, $token),
                 'instagram' => $this->publishToInstagram($post, $account, $token),
                 'linkedin'  => $this->publishToLinkedIn($post, $account, $token),
+                'gmb'       => $this->publishToGMB($post, $account, $token),
                 default     => throw new \Exception("Unsupported platform: {$account->platform}"),
             };
 
@@ -356,6 +357,71 @@ class PublishPost implements ShouldQueue
 
         $platformPostId = $response->header('x-linkedin-id');
         \Log::info("LinkedIn publish successful. Platform Post ID: {$platformPostId}");
+
+        return ['platform_post_id' => $platformPostId];
+    }
+
+    private function publishToGMB(Post $post, SocialAccount $account, string $token): array
+    {
+        // The GMB API v4 expects accounts/{accountId}/locations/{locationId}/localPosts
+        // But the v1 Business Information API returns locations/{locationId}.
+        // We will try to fetch the account list first to construct the full path if needed, 
+        // or just use the platform_account_id if it already has the account prefix.
+        
+        $locationId = $account->platform_account_id;
+        \Log::info("Starting GMB publish for post #{$post->id} to Location ID: {$locationId}");
+        
+        if (!str_starts_with($locationId, 'accounts/')) {
+            // Fetch accounts to reconstruct the full path
+            $accResp = Http::withToken($token)->get('https://mybusinessbusinessinformation.googleapis.com/v1/accounts');
+            if ($accResp->successful() && isset($accResp->json()['accounts'])) {
+                $accounts = $accResp->json()['accounts'];
+                if (count($accounts) > 0) {
+                    $locationId = $accounts[0]['name'] . '/' . $locationId;
+                }
+            }
+        }
+        
+        $endpoint = "https://mybusiness.googleapis.com/v4/{$locationId}/localPosts";
+        
+        $payload = [
+            'languageCode' => 'en',
+            'summary' => $this->buildContent($post),
+            'callToAction' => [
+                'actionType' => 'LEARN_MORE',
+                'url' => $post->link ?? url('/'),
+            ]
+        ];
+
+        if ($post->media_path && in_array($post->post_type, ['image', 'video'])) {
+            $url = url($post->media_path);
+            
+            // If localhost, use a fallback public URL for testing since GMB requires a public URL
+            if (str_contains($url, 'localhost') || str_contains($url, '127.0.0.1')) {
+                \Log::info("GMB: Localhost detected, using fallback public image URL for testing.");
+                $url = 'https://images.unsplash.com/photo-1522204523234-8729aa6e3d5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80.jpg';
+            }
+
+            $payload['media'] = [
+                [
+                    'mediaFormat' => 'PHOTO',
+                    'sourceUrl' => $url,
+                ]
+            ];
+        }
+
+        \Log::info("Sending GMB localPost payload to {$endpoint}", $payload);
+        
+        $response = Http::withToken($token)->post($endpoint, $payload);
+        
+        if (!$response->successful()) {
+            $err = $response->json()['error']['message'] ?? $response->body();
+            \Log::error('GMB API Error: ' . $err);
+            throw new \Exception("Google My Business API Error: " . $err);
+        }
+
+        $platformPostId = $response->json()['name'];
+        \Log::info("GMB publish successful. Platform Post ID: {$platformPostId}");
 
         return ['platform_post_id' => $platformPostId];
     }

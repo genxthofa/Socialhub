@@ -1,24 +1,32 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import axios from 'axios'
-import { useSocialAccountsStore } from '../../store'
+import { useSocialAccountsStore, useMediaStore } from '../../store'
 import { DashboardLayout } from '../../components/Layout'
-import { Button, PlatformIcon, StepWizard } from '../../components/ui'
+import { Button, PlatformIcon, StepWizard, Modal } from '../../components/ui'
 
 const STEPS = ['Platform', 'Campaign', 'Audience', 'Budget', 'Creative', 'Review']
 
 const OBJECTIVES = [
-  { key: 'awareness', label: 'Brand Awareness', desc: 'Reach people more likely to remember your ad' },
-  { key: 'traffic', label: 'Traffic', desc: 'Send people to a destination on or off Facebook' },
-  { key: 'engagement', label: 'Engagement', desc: 'Get more post reactions, comments, and shares' },
-  { key: 'leads', label: 'Lead Generation', desc: 'Collect leads for your business directly from ads' },
-  { key: 'app_installs', label: 'App Installs', desc: 'Send people to the store to purchase your app' },
-  { key: 'conversions', label: 'Conversions', desc: 'Get people to take valuable actions on your site' },
+  { key: 'awareness', label: 'Brand Awareness', desc: 'Reach people more likely to remember your ad', icon: '📢' },
+  { key: 'traffic', label: 'Traffic', desc: 'Send people to a destination on or off Facebook', icon: '🔗' },
+  { key: 'engagement', label: 'Engagement', desc: 'Get more post reactions, comments, and shares', icon: '👍' },
+  { key: 'leads', label: 'Lead Generation', desc: 'Collect leads for your business directly from ads', icon: '📋' },
+  { key: 'app_installs', label: 'App Installs', desc: 'Send people to the store to purchase your app', icon: '📱' },
+  { key: 'conversions', label: 'Conversions', desc: 'Get people to take valuable actions on your site', icon: '🎯' },
 ]
 
 const INTERESTS = ['Technology', 'Business', 'Marketing', 'Fashion', 'Travel', 'Food', 'Fitness', 'Gaming', 'Finance', 'Education', 'Parenting', 'Sports', 'Photography', 'Art', 'Music']
 const COUNTRIES = ['United States', 'United Kingdom', 'Canada', 'Australia', 'India', 'Germany', 'France', 'Brazil', 'Singapore', 'UAE']
+
+const CURRENCY_SYMBOLS = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  INR: '₹',
+  CAD: 'CA$',
+}
 
 const StepPanel = ({ title, subtitle, children }) => (
   <div className="card animate-slide-up" style={{ maxWidth: 680, margin: '0 auto' }}>
@@ -59,8 +67,14 @@ export default function CreateCampaign() {
     description: '',
     cta: 'Learn More',
     destinationUrl: '',
-    adImage: null,
+    adMedia: null,
   })
+
+  const fileInputRef = useRef()
+  const [adMediaPreview, setAdMediaPreview] = useState(null)
+  const [mediaSourceModalOpen, setMediaSourceModalOpen] = useState(false)
+  const [mediaLibraryModalOpen, setMediaLibraryModalOpen] = useState(false)
+  const { media: libraryItems, fetchMedia, fetched: libraryFetched } = useMediaStore()
 
   const update = (key, val) => setCampaign(c => ({ ...c, [key]: val }))
   const togglePlatform = (p) => setCampaign(c => ({ ...c, platforms: c.platforms.includes(p) ? c.platforms.filter(x => x !== p) : [...c.platforms, p] }))
@@ -103,6 +117,7 @@ export default function CreateCampaign() {
         description: campaign.description,
         cta: campaign.cta,
         destination_url: campaign.destinationUrl,
+        ad_media_path: adMediaPreview || null,
       }
 
       await axios.post('/api/campaigns', payload, { headers: { 'Content-Type': 'application/json' } })
@@ -126,11 +141,12 @@ export default function CreateCampaign() {
       {/* Step 0: Platform */}
       {step === 0 && (
         <StepPanel title="Select Platforms" subtitle="Choose the advertising platforms for your campaign">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {['facebook', 'instagram', 'linkedin'].map(p => {
-              const names = { facebook: 'Facebook Ads', instagram: 'Instagram Ads', linkedin: 'LinkedIn Ads' }
-              const descs = { facebook: 'Reach 3B+ users with targeted ads', instagram: 'Visual ads for engaged audiences', linkedin: 'B2B ads for professionals' }
-              const colors = { facebook: 'var(--color-brand-500)', instagram: '#ec4899', linkedin: '#0a66c2' }
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {['facebook', 'instagram', 'linkedin', 'google_ads'].map(p => {
+              const names = { facebook: 'Facebook Ads', instagram: 'Instagram Ads', linkedin: 'LinkedIn Ads', google_ads: 'Google Ads' }
+              const descs = { facebook: 'Reach 3B+ users with targeted ads', instagram: 'Visual ads for engaged audiences', linkedin: 'B2B ads for professionals', google_ads: 'Reach customers searching on Google' }
+              const colors = { facebook: 'var(--color-brand-500)', instagram: '#ec4899', linkedin: '#0a66c2', google_ads: '#4285F4' }
+              const connectedAccount = accounts.find(a => a.platform === p && a.status === 'active')
               
               return (
                 <button
@@ -140,14 +156,25 @@ export default function CreateCampaign() {
                     padding: 24, borderRadius: 'var(--radius-xl)', border: `2px solid ${campaign.platforms.includes(p) ? colors[p] : 'var(--border-primary)'}`,
                     background: 'var(--bg-card)', cursor: 'pointer', textAlign: 'center', transition: 'all var(--transition-fast)',
                     boxShadow: campaign.platforms.includes(p) ? `0 0 0 4px ${colors[p]}15` : 'var(--shadow-sm)',
-                    fontFamily: 'inherit'
+                    fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center'
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
                     <PlatformIcon platform={p} size={36} />
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--text-primary)', marginBottom: 6 }}>{names[p]}</div>
-                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>{descs[p]}</div>
+                  <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', lineHeight: 1.5, marginBottom: 10 }}>{descs[p]}</div>
+                  
+                  {connectedAccount ? (
+                    <div style={{ fontSize: '11px', background: 'var(--color-success-50)', color: 'var(--color-success-600)', padding: '4px 10px', borderRadius: 'var(--radius-full)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      ✓ {connectedAccount.account_name}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '11px', background: 'var(--bg-secondary)', color: 'var(--text-tertiary)', padding: '4px 10px', borderRadius: 'var(--radius-full)', fontWeight: 600 }}>
+                      Auto-linked Meta Account
+                    </div>
+                  )}
+
                   {campaign.platforms.includes(p) && (
                     <div style={{ marginTop: 12, width: 24, height: 24, borderRadius: '50%', background: colors[p], display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '12px auto 0', color: 'white', fontSize: 12 }}>✓</div>
                   )}
@@ -282,7 +309,7 @@ export default function CreateCampaign() {
             <div className="form-group">
               <label className="form-label">{campaign.budgetType === 'daily' ? 'Daily' : 'Lifetime'} Budget <span className="form-label-required">*</span></label>
               <div className="input-wrapper">
-                <span className="input-icon-left" style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>$</span>
+                <span className="input-icon-left" style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>{CURRENCY_SYMBOLS[campaign.currency] || '$'}</span>
                 <input type="number" className="form-input has-icon-left" placeholder="50.00" value={campaign.budget} onChange={e => update('budget', e.target.value)} min="1" step="0.01" />
               </div>
             </div>
@@ -347,13 +374,35 @@ export default function CreateCampaign() {
 
           <div className="form-group">
             <label className="form-label">Ad Image / Video</label>
-            <div className="upload-zone" style={{ padding: '28px' }}>
-              <div className="upload-zone-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            {adMediaPreview ? (
+              <div style={{ position: 'relative', width: '100%', maxHeight: 220, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                <img src={adMediaPreview} alt="Ad Media" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button
+                  onClick={() => setAdMediaPreview(null)}
+                  style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: 26, height: 26, cursor: 'pointer' }}
+                >×</button>
               </div>
-              <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>Upload ad creative</p>
-              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>1200×628px recommended · PNG, JPG, MP4</p>
-            </div>
+            ) : (
+              <div className="upload-zone" onClick={() => setMediaSourceModalOpen(true)} style={{ padding: '28px' }}>
+                <div className="upload-zone-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                </div>
+                <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>Click to upload ad creative</p>
+                <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>Local System or Media Library</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files[0]
+                    if (file) {
+                      setAdMediaPreview(URL.createObjectURL(file))
+                    }
+                  }}
+                />
+              </div>
+            )}
           </div>
         </StepPanel>
       )}
@@ -363,13 +412,13 @@ export default function CreateCampaign() {
         <StepPanel title="Review & Submit" subtitle="Confirm all details before submitting">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {[
-              { label: 'Platform', value: campaign.platform.charAt(0).toUpperCase() + campaign.platform.slice(1) },
+              { label: 'Platforms', value: campaign.platforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ') || 'None' },
               { label: 'Campaign Name', value: campaign.name },
               { label: 'Objective', value: campaign.objective },
               { label: 'Locations', value: campaign.locations.join(', ') || 'Not set' },
               { label: 'Audience', value: `${campaign.ageMin}–${campaign.ageMax} yrs, ${campaign.gender}` },
               { label: 'Interests', value: campaign.interests.join(', ') || 'None' },
-              { label: 'Budget', value: `${campaign.currency} $${campaign.budget} / ${campaign.budgetType}` },
+              { label: 'Budget', value: `${campaign.currency} ${CURRENCY_SYMBOLS[campaign.currency] || '$'}${campaign.budget} / ${campaign.budgetType}` },
               { label: 'Schedule', value: `${campaign.startDate}${campaign.endDate ? ` – ${campaign.endDate}` : ' (no end date)'}` },
               { label: 'Headline', value: campaign.headline },
               { label: 'CTA', value: campaign.cta },
@@ -399,10 +448,113 @@ export default function CreateCampaign() {
           </Button>
         ) : (
           <Button variant="success" loading={submitting} onClick={handleSubmit}>
-            Submit Campaign
+            Submit Campaign 🚀
           </Button>
         )}
       </div>
+
+      {/* Choice Modal: Local System vs Media Library */}
+      <Modal
+        isOpen={mediaSourceModalOpen}
+        onClose={() => setMediaSourceModalOpen(false)}
+        title="Select Media Source"
+        size="md"
+      >
+        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 20 }}>
+          Choose where you want to select your ad creative from:
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <button
+            onClick={() => {
+              setMediaSourceModalOpen(false)
+              fileInputRef.current?.click()
+            }}
+            style={{
+              padding: '24px 16px', borderRadius: 'var(--radius-xl)', background: 'var(--bg-secondary)',
+              border: '1.5px solid var(--border-primary)', cursor: 'pointer', display: 'flex',
+              flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center', transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-brand-500)'; e.currentTarget.style.background = 'var(--color-brand-50)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.background = 'var(--bg-secondary)' }}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-brand-100)', color: 'var(--color-brand-600)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>Local System</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 4 }}>Upload image or video from your computer / device</div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              setMediaSourceModalOpen(false)
+              if (!libraryFetched) fetchMedia()
+              setMediaLibraryModalOpen(true)
+            }}
+            style={{
+              padding: '24px 16px', borderRadius: 'var(--radius-xl)', background: 'var(--bg-secondary)',
+              border: '1.5px solid var(--border-primary)', cursor: 'pointer', display: 'flex',
+              flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center', transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = '#ecfdf5' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.background = 'var(--bg-secondary)' }}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#d1fae5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>Media Library</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 4 }}>Choose from posters/media in your SocialHub library</div>
+            </div>
+          </button>
+        </div>
+      </Modal>
+
+      {/* Select from Media Library Modal */}
+      <Modal
+        isOpen={mediaLibraryModalOpen}
+        onClose={() => setMediaLibraryModalOpen(false)}
+        title="Select Media from Library"
+        size="lg"
+      >
+        {libraryItems.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <p>No media files found in your Media Library.</p>
+            <p style={{ fontSize: 'var(--font-size-xs)', marginTop: 4 }}>Upload media files in the Media Library page or choose Local System.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+            {libraryItems.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => {
+                  setAdMediaPreview(item.url)
+                  toast.success(`Selected ${item.name}!`)
+                  setMediaLibraryModalOpen(false)
+                }}
+                style={{
+                  position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                  border: '2px solid var(--border-primary)', cursor: 'pointer', transition: 'all 0.2s ease', background: 'var(--bg-secondary)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-brand-500)'; e.currentTarget.style.transform = 'scale(1.03)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.transform = 'scale(1)' }}
+              >
+                {item.type === 'video' ? (
+                  <div style={{ width: '100%', height: '100%', background: '#1e1e2d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                ) : (
+                  <img src={item.url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                )}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '4px 6px', background: 'rgba(0,0,0,0.6)', color: 'white', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </DashboardLayout>
   )
 }

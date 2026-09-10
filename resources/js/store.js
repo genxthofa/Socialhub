@@ -253,21 +253,7 @@ export const useMediaStore = create((set) => ({
     } catch (e) {
       set({ media: [], fetched: true })
     }
-  }
-}))
-
-export const useAdminStore = create((set) => ({
-  users: [],
-  fetched: false,
-  fetchUsers: async () => {
-    try {
-      const token = useAuthStore.getState().token
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-      const res = await axios.get('/api/admin/users', config)
-      const data = res.data.data || res.data || []
-      set({ users: Array.isArray(data) ? data : [], fetched: true })
-    } catch (e) {
-      set({ users: [], fetched: true })
-    }
-  }
+  },
+  addMediaItems: (items) => set((state) => ({ media: [...items, ...state.media] })),
+  removeMediaItems: (ids) => set((state) => ({ media: state.media.filter(x => !ids.includes(x.id)) })),
 }))

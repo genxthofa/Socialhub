@@ -35,4 +35,23 @@ return [
         ],
     ],
 
+    'meta' => [
+        'client_id'     => env('META_APP_ID') ?? env('FACEBOOK_APP_ID'),
+        'client_secret' => env('META_APP_SECRET') ?? env('FACEBOOK_APP_SECRET'),
+        'redirect'      => env('META_REDIRECT_URI') ?? env('FACEBOOK_REDIRECT_URI'),
+    ],
+
+    'facebook' => [
+        'client_id'     => env('META_APP_ID') ?? env('FACEBOOK_APP_ID'),
+        'client_secret' => env('META_APP_SECRET') ?? env('FACEBOOK_APP_SECRET'),
+        'redirect'      => env('META_REDIRECT_URI') ?? env('FACEBOOK_REDIRECT_URI'),
+    ],
+
+    'instagram' => [
+        'client_id'     => env('META_APP_ID') ?? env('INSTAGRAM_APP_ID'),
+        'client_secret' => env('META_APP_SECRET') ?? env('INSTAGRAM_APP_SECRET'),
+        'redirect'      => env('META_REDIRECT_URI') ?? env('META_REDIRECT_URI'),
+    ],
+
 ];
+

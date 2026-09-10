@@ -9,7 +9,7 @@ use App\Http\Controllers\API\CampaignController;
 use App\Http\Controllers\API\AnalyticsController;
 use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\API\WebhookController;
-use App\Http\Controllers\API\AdminController;
+use App\Http\Controllers\API\GoogleAccountController;
 
 /*
 |--------------------------------------------------------------------------
@@ -32,6 +32,7 @@ Route::prefix('oauth')->group(function () {
     Route::get('/instagram', [SocialAccountController::class, 'oauthInstagram']);
     Route::get('/instagram/callback', [SocialAccountController::class, 'oauthInstagramCallback']);
     Route::get('/linkedin/callback', [SocialAccountController::class, 'oauthLinkedInCallback']);
+    Route::get('/google-business/callback', [GoogleAccountController::class, 'oauthGoogleBusinessCallback']);
 });
 
 // ─── Google SSO (matching Google Console config) ───────────────────────────
@@ -72,6 +73,13 @@ Route::middleware('auth:sanctum')->group(function () {
         
         // LinkedIn OAuth Initialization
         Route::get('/oauth/linkedin', [SocialAccountController::class, 'oauthLinkedIn']);
+        
+        // Google Business & Ads
+        Route::get('/google-business/url', [GoogleAccountController::class, 'oauthGoogleBusinessUrl']);
+        Route::get('/google-business/locations', [GoogleAccountController::class, 'getGoogleLocations']);
+        Route::post('/google-business/confirm', [GoogleAccountController::class, 'confirmGoogleAccounts']);
+        Route::get('/google-ads/url', [GoogleAccountController::class, 'oauthGoogleAdsUrl']);
+        Route::post('/google-ads/confirm', [GoogleAccountController::class, 'confirmGoogleAds']);
         
         Route::get('/accounts/{id}', [SocialAccountController::class, 'show']);
         Route::get('/accounts/{id}/status', [SocialAccountController::class, 'checkStatus']);
@@ -133,17 +141,5 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{id}', [NotificationController::class, 'destroy']);
     });
 
-    // Admin routes
-    Route::middleware('role:admin')->prefix('admin')->group(function () {
-        Route::get('/dashboard', [AdminController::class, 'dashboard']);
-        Route::get('/users', [AdminController::class, 'users']);
-        Route::get('/users/{id}', [AdminController::class, 'showUser']);
-        Route::put('/users/{id}', [AdminController::class, 'updateUser']);
-        Route::post('/users/{id}/activate', [AdminController::class, 'activateUser']);
-        Route::post('/users/{id}/deactivate', [AdminController::class, 'deactivateUser']);
-        Route::get('/logs', [AdminController::class, 'auditLogs']);
-        Route::get('/api-errors', [AdminController::class, 'apiErrors']);
-        Route::get('/system-stats', [AdminController::class, 'systemStats']);
-        Route::put('/settings', [AdminController::class, 'updateSettings']);
-    });
+    // Admin routes removed
 });

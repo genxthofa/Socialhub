@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { toast } from 'react-hot-toast'
 import { DashboardLayout } from '../../components/Layout'
-import { Button, PlatformIcon, Avatar } from '../../components/ui'
-import { useSocialAccountsStore, usePostsStore } from '../../store'
+import { Button, PlatformIcon, Avatar, Modal } from '../../components/ui'
+import { useSocialAccountsStore, usePostsStore, useMediaStore } from '../../store'
 import axios from 'axios'
 
 const PLATFORM_COLORS = { facebook: '#1877f2', instagram: '#e1306c', linkedin: '#0077b5' }
@@ -131,9 +131,12 @@ export default function CreatePost() {
   const [mediaPreview, setMediaPreview] = useState(null)
   const [loading, setLoading] = useState(false)
   const [charCount, setCharCount] = useState(0)
+  const [mediaSourceModalOpen, setMediaSourceModalOpen] = useState(false)
+  const [mediaLibraryModalOpen, setMediaLibraryModalOpen] = useState(false)
 
   const { accounts, fetchAccounts, fetched: accountsFetched } = useSocialAccountsStore()
   const { fetchPosts } = usePostsStore()
+  const { media: libraryItems, fetchMedia, fetched: libraryFetched } = useMediaStore()
 
   useEffect(() => {
     if (!accountsFetched) fetchAccounts()
@@ -215,7 +218,13 @@ export default function CreatePost() {
     try {
       let mediaBase64 = null;
       if (media) {
-        mediaBase64 = await getBase64(media);
+        if (media.isLibraryUrl) {
+          mediaBase64 = media.url;
+        } else if (media instanceof File) {
+          mediaBase64 = await getBase64(media);
+        } else if (mediaPreview) {
+          mediaBase64 = mediaPreview;
+        }
       }
 
       let res;
@@ -470,7 +479,7 @@ export default function CreatePost() {
                 ) : (
                   <div
                     className="upload-zone"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => setMediaSourceModalOpen(true)}
                     style={{ padding: '32px' }}
                   >
                     <div className="upload-zone-icon">
@@ -479,10 +488,10 @@ export default function CreatePost() {
                       </svg>
                     </div>
                     <p style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      Click to upload or drag & drop
+                      Click to choose media source
                     </p>
                     <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
-                      PNG, JPG, GIF, MP4 up to 50MB
+                      Local System or Media Library
                     </p>
                     <input ref={fileInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={handleMediaChange} />
                   </div>
@@ -694,6 +703,134 @@ export default function CreatePost() {
           </div>
         </div>
       </div>
+
+      {/* Choice Modal: Local System vs Media Library */}
+      <Modal
+        isOpen={mediaSourceModalOpen}
+        onClose={() => setMediaSourceModalOpen(false)}
+        title="Select Media Source"
+        size="md"
+      >
+        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 20 }}>
+          Choose where you want to select your poster or media from:
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {/* Local System */}
+          <button
+            onClick={() => {
+              setMediaSourceModalOpen(false)
+              fileInputRef.current?.click()
+            }}
+            style={{
+              padding: '24px 16px',
+              borderRadius: 'var(--radius-xl)',
+              background: 'var(--bg-secondary)',
+              border: '1.5px solid var(--border-primary)',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+              textAlign: 'center',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-brand-500)'; e.currentTarget.style.background = 'var(--color-brand-50)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.background = 'var(--bg-secondary)' }}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--color-brand-100)', color: 'var(--color-brand-600)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>Local System</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 4 }}>Upload image or video from your computer / device</div>
+            </div>
+          </button>
+
+          {/* Media Library */}
+          <button
+            onClick={() => {
+              setMediaSourceModalOpen(false)
+              if (!libraryFetched) fetchMedia()
+              setMediaLibraryModalOpen(true)
+            }}
+            style={{
+              padding: '24px 16px',
+              borderRadius: 'var(--radius-xl)',
+              background: 'var(--bg-secondary)',
+              border: '1.5px solid var(--border-primary)',
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 12,
+              textAlign: 'center',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#10b981'; e.currentTarget.style.background = '#ecfdf5' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.background = 'var(--bg-secondary)' }}
+          >
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#d1fae5', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 'var(--font-size-md)', color: 'var(--text-primary)' }}>Media Library</div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginTop: 4 }}>Choose from posters/media in your SocialHub library</div>
+            </div>
+          </button>
+        </div>
+      </Modal>
+
+      {/* Select from Media Library Modal */}
+      <Modal
+        isOpen={mediaLibraryModalOpen}
+        onClose={() => setMediaLibraryModalOpen(false)}
+        title="Select Media from Library"
+        size="lg"
+      >
+        {libraryItems.length === 0 ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+            <p>No media files found in your Media Library.</p>
+            <p style={{ fontSize: 'var(--font-size-xs)', marginTop: 4 }}>Upload media files in the Media Library page or choose Local System.</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, maxHeight: 380, overflowY: 'auto', paddingRight: 4 }}>
+            {libraryItems.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => {
+                  setMediaPreview(item.url)
+                  setMedia({ isLibraryUrl: true, url: item.url, type: item.type === 'video' ? 'video/mp4' : 'image/jpeg' })
+                  toast.success(`Attached ${item.name}!`)
+                  setMediaLibraryModalOpen(false)
+                }}
+                style={{
+                  position: 'relative',
+                  aspectRatio: '1',
+                  borderRadius: 'var(--radius-lg)',
+                  overflow: 'hidden',
+                  border: '2px solid var(--border-primary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: 'var(--bg-secondary)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-brand-500)'; e.currentTarget.style.transform = 'scale(1.03)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.transform = 'scale(1)' }}
+              >
+                {item.type === 'video' ? (
+                  <div style={{ width: '100%', height: '100%', background: '#1e1e2d', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white' }}>
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  </div>
+                ) : (
+                  <img src={item.url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                )}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '4px 6px', background: 'rgba(0,0,0,0.6)', color: 'white', fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </DashboardLayout>
   )
 }

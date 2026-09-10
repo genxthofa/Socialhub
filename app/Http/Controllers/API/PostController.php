@@ -92,6 +92,8 @@ class PostController extends Controller
                 }
                 \File::put($uploadPath . '/' . $filename, $data);
                 $mediaPath = '/uploads/posts/' . $filename;
+            } else {
+                $mediaPath = $base64Data;
             }
         }
 
