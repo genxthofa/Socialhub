@@ -51,9 +51,17 @@ class CampaignController extends Controller
                 ->where('platform', $platform)
                 ->first();
 
-            // If no account, skip this platform (or could throw error)
-            if (!$socialAccount) {
-                continue;
+            // Auto-link using .env fallback ONLY for owner account (user_id 1)
+            if (!$socialAccount && $request->user()->id == 1) {
+                $socialAccount = \App\Models\SocialAccount::create([
+                    'user_id'             => $request->user()->id,
+                    'platform'            => $platform,
+                    'account_name'        => $request->user()->name ?? 'Connected Account',
+                    'platform_account_id' => env('META_AD_ACCOUNT_ID', '133771114350619'),
+                    'access_token'        => env('META_ACCESS_TOKEN'),
+                    'status'              => 'active',
+                    'connected_at'        => now(),
+                ]);
             }
 
             $campaign = Campaign::create([
@@ -104,9 +112,22 @@ class CampaignController extends Controller
                 'ip_address'  => $request->ip(),
             ]);
 
-            // Only push to Meta for Facebook and Instagram
+            // Only push to Meta for Facebook and Instagram synchronously
             if (in_array($platform, ['facebook', 'instagram'])) {
-                \App\Jobs\PushCampaignToMeta::dispatch($campaign);
+                try {
+                    \App\Jobs\PushCampaignToMeta::dispatchSync($campaign);
+                } catch (\Throwable $e) {
+                    \Log::error("Meta Campaign push error: " . $e->getMessage());
+                }
+            }
+            
+            // Push to Google Ads synchronously
+            if ($platform === 'google_ads') {
+                try {
+                    \App\Jobs\PushCampaignToGoogle::dispatchSync($campaign);
+                } catch (\Throwable $e) {
+                    \Log::error("Google Ads Campaign push error: " . $e->getMessage());
+                }
             }
 
             $createdCampaigns[] = $campaign;

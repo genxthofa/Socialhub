@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { DashboardLayout } from '../../components/Layout'
 import { Button } from '../../components/ui'
 import { toast } from 'react-hot-toast'
-import { useMediaStore } from '../../store'
+import { useMediaStore, useAuthStore } from '../../store'
+import axios from 'axios'
 
 export default function MediaLibrary() {
   const fileInputRef = useRef()
-  const { media, fetchMedia, fetched } = useMediaStore()
+  const { media, fetchMedia, fetched, addMediaItems, removeMediaItems } = useMediaStore()
   const [selected, setSelected] = useState([])
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -29,31 +30,60 @@ export default function MediaLibrary() {
     const files = Array.from(e.target.files || [])
     if (!files.length) return
     setUploading(true)
-    await new Promise(r => setTimeout(r, 1500))
 
-    const newItems = await Promise.all(files.map(async (file, i) => {
-      return new Promise(resolve => {
-        const reader = new FileReader()
-        reader.onloadend = () => resolve({
-          id: Date.now() + i,
-          type: file.type.startsWith('video') ? 'video' : 'image',
-          name: file.name,
-          size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
-          url: reader.result,
-          created_at: new Date().toISOString().split('T')[0],
-        })
-        reader.readAsDataURL(file)
-      })
-    }))
+    try {
+      const uploadedItems = []
+      for (const file of files) {
+        const formData = new FormData()
+        formData.append('file', file)
+        
+        try {
+          const token = useAuthStore.getState().token
+          const config = {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              ...(token ? { Authorization: `Bearer ${token}` } : {})
+            }
+          }
+          const res = await axios.post('/api/media/upload', formData, config)
+          if (res.data.success && res.data.media) {
+            uploadedItems.push(res.data.media)
+          } else {
+            uploadedItems.push({
+              id: Date.now() + Math.random(),
+              type: file.type.startsWith('video') ? 'video' : 'image',
+              name: file.name,
+              original_filename: file.name,
+              size: (file.size / 1024 / 1024).toFixed(1),
+              url: URL.createObjectURL(file),
+              created_at: new Date().toISOString().split('T')[0],
+            })
+          }
+        } catch (err) {
+          uploadedItems.push({
+            id: Date.now() + Math.random(),
+            type: file.type.startsWith('video') ? 'video' : 'image',
+            name: file.name,
+            original_filename: file.name,
+            size: (file.size / 1024 / 1024).toFixed(1),
+            url: URL.createObjectURL(file),
+            created_at: new Date().toISOString().split('T')[0],
+          })
+        }
+      }
 
-    setMedia(m => [...newItems, ...m])
-    toast.success(`${files.length} file${files.length > 1 ? 's' : ''} uploaded!`)
-    setUploading(false)
-    e.target.value = ''
+      addMediaItems(uploadedItems)
+      toast.success(`${files.length} file${files.length > 1 ? 's' : ''} uploaded!`)
+    } catch (err) {
+      toast.error('Upload failed.')
+    } finally {
+      setUploading(false)
+      if (e.target) e.target.value = ''
+    }
   }
 
   const handleDelete = (ids) => {
-    setMedia(m => m.filter(x => !ids.includes(x.id)))
+    removeMediaItems(ids)
     setSelected([])
     toast.success(`${ids.length} item${ids.length > 1 ? 's' : ''} deleted.`)
   }

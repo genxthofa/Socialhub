@@ -34,15 +34,27 @@ class PushCampaignToMeta implements ShouldQueue
             return;
         }
 
-        $adAccountId = env('META_AD_ACCOUNT_ID');
+        // Multi-tenant protection: .env fallback is strictly isolated to owner (user_id 1)
+        $isOwner = ($this->campaign->user_id == 1);
+
+        $adAccountId = $account->platform_account_id;
+        if (!$adAccountId && $isOwner) {
+            $adAccountId = env('META_AD_ACCOUNT_ID');
+        }
+
         if (!$adAccountId) {
             $this->campaign->update(['status' => 'rejected']);
-            Log::error("Campaign {$this->campaign->id} failed: META_AD_ACCOUNT_ID is not configured in .env");
+            Log::error("Campaign {$this->campaign->id} failed: User has not connected a Meta Ad Account.");
             return;
         }
 
-        $baseUrl = "https://graph.facebook.com/v19.0/act_{$adAccountId}";
+        $formattedAdAccountId = str_starts_with($adAccountId, 'act_') ? $adAccountId : "act_{$adAccountId}";
+        $baseUrl = "https://graph.facebook.com/v19.0/{$formattedAdAccountId}";
+
         $accessToken = $account->access_token;
+        if (!$accessToken && $isOwner) {
+            $accessToken = env('META_ACCESS_TOKEN');
+        }
 
         try {
             // 1. Create Campaign

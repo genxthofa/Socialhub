@@ -7,6 +7,14 @@ import { Button, PlatformIcon, StatusBadge, Tabs } from '../../components/ui'
 
 const PLATFORM_COLORS = { facebook: '#1877f2', instagram: '#e1306c', linkedin: '#0077b5' }
 
+const CURRENCY_SYMBOLS = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  INR: '₹',
+  CAD: 'CA$',
+}
+
 function CampaignCard({ campaign, onPause, onResume, onDuplicate }) {
   const budget = parseFloat(campaign.budget) || 0
   const spend = parseFloat(campaign.spend) || 0
@@ -51,7 +59,7 @@ function CampaignCard({ campaign, onPause, onResume, onDuplicate }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
             <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', fontWeight: 600 }}>Budget used</span>
             <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 700, color: pct > 90 ? 'var(--color-error-500)' : 'var(--text-primary)' }}>
-              ${spend.toFixed(0)} / ${budget} ({pct.toFixed(0)}%)
+              {CURRENCY_SYMBOLS[campaign.currency || 'INR'] || '₹'}{spend.toFixed(0)} / {CURRENCY_SYMBOLS[campaign.currency || 'INR'] || '₹'}{budget} ({pct.toFixed(0)}%)
             </span>
           </div>
           <div className="progress-bar">
@@ -66,7 +74,16 @@ function CampaignCard({ campaign, onPause, onResume, onDuplicate }) {
         </div>
       </div>
 
-      <div style={{ padding: '10px 24px', borderTop: '1px solid var(--border-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+      <div style={{ padding: '10px 24px', borderTop: '1px solid var(--border-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
+        <a
+          href={`https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${campaign.platform_account_id || '2038402906881435'}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-secondary btn-sm"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
+        >
+          <PlatformIcon platform="facebook" size={14} /> Meta Ads Manager ↗
+        </a>
         <Button variant="ghost" size="sm" onClick={() => onDuplicate(campaign)}>Duplicate</Button>
         {campaign.status === 'active' && (
           <Button variant="secondary" size="sm" onClick={() => onPause(campaign)}>⏸ Pause</Button>

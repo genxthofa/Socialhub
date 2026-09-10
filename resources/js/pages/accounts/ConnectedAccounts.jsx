@@ -24,6 +24,18 @@ const PLATFORM_INFO = {
     color: '#0077b5',
     scopes: ['r_liteprofile', 'w_member_social', 'r_ads', 'w_ads'],
   },
+  gmb: {
+    name: 'Google Business Profile',
+    desc: 'Connect Google Business locations to post updates and manage reviews.',
+    color: '#4285F4',
+    scopes: ['business.manage'],
+  },
+  google_ads: {
+    name: 'Google Ads',
+    desc: 'Connect Google Ads to create and manage search campaigns.',
+    color: '#0F9D58',
+    scopes: ['adwords'],
+  },
 }
 
 function SelectMetaAccountsModal({ metaKey, onClose, onConfirm }) {
@@ -162,6 +174,75 @@ function SelectMetaAccountsModal({ metaKey, onClose, onConfirm }) {
   )
 }
 
+function SelectGoogleAccountsModal({ googleKey, onClose, onConfirm }) {
+  const [accounts, setAccounts] = useState([])
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (googleKey) {
+      setLoading(true)
+      axios.get(`/api/social/google-business/locations?key=${googleKey}`)
+        .then(res => {
+          if (res.data.success) {
+            setAccounts(res.data.accounts)
+            setSelectedIds(new Set(res.data.accounts.map(a => a.id)))
+          }
+        })
+        .catch(() => { toast.error('Failed to load Google accounts'); onClose() })
+        .finally(() => setLoading(false))
+    }
+  }, [googleKey])
+
+  const toggleSelection = (id) => {
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    setSelectedIds(next)
+  }
+
+  const handleConfirm = () => {
+    if (selectedIds.size === 0) { toast.error('Please select at least one account'); return }
+    setSubmitting(true)
+    axios.post('/api/social/google-business/confirm', { key: googleKey, selected_ids: Array.from(selectedIds) })
+      .then(res => { if (res.data.success) { toast.success(res.data.message); onConfirm() } })
+      .catch(() => toast.error('Failed to connect accounts'))
+      .finally(() => setSubmitting(false))
+  }
+
+  if (!googleKey) return null
+
+  return (
+    <Modal isOpen={!!googleKey} onClose={onClose} title="Select Google Accounts"
+      footer={<><Button variant="ghost" onClick={onClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={handleConfirm} disabled={submitting || loading}>{submitting ? 'Connecting...' : 'Finish Connection'}</Button></>}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {loading ? <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)' }}>Loading accounts...</div>
+        : accounts.length === 0 ? <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-tertiary)' }}>No accounts found.</div>
+        : <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 300, overflowY: 'auto' }}>
+            {accounts.map(acc => (
+              <label key={acc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-lg)', cursor: 'pointer', background: selectedIds.has(acc.id) ? 'var(--bg-secondary)' : 'var(--bg-card)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <PlatformIcon platform={acc.platform} size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>{acc.account_name}</div>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      {acc.platform_type === 'google_ads' ? 'Google Ads Account' : 'Google Business Profile'}
+                    </div>
+                  </div>
+                </div>
+                <input type="checkbox" checked={selectedIds.has(acc.id)} onChange={() => toggleSelection(acc.id)} style={{ cursor: 'pointer', transform: 'scale(1.2)' }} />
+              </label>
+            ))}
+          </div>
+        }
+      </div>
+    </Modal>
+  )
+}
+
 function AccountSettingsModal({ isOpen, onClose, account }) {
   const [settings, setSettings] = useState({
     requireApproval: true,
@@ -250,7 +331,11 @@ function AccountSettingsModal({ isOpen, onClose, account }) {
 }
 
 function AccountCard({ account, onDisconnect, onReconnect, onSettingsClick }) {
-  const info = PLATFORM_INFO[account.platform]
+  const info = PLATFORM_INFO[account.platform] || {
+    name: account.platform,
+    color: '#6b7280',
+    scopes: [],
+  }
   const isExpired = account.status === 'expired'
 
   return (
@@ -372,6 +457,36 @@ function ConnectModal({ isOpen, onClose }) {
         .catch(err => {
           console.error('LinkedIn connect error:', err)
           toast.error(err.response?.data?.message || 'Failed to initialize LinkedIn login')
+          setConnecting(null)
+        })
+    } else if (platform === 'gmb') {
+      axios.get(`/api/social/google-business/url`)
+        .then(res => {
+          if (res.data?.url) {
+            window.location.href = res.data.url
+          } else {
+            toast.error('Could not generate Google Business login URL')
+            setConnecting(null)
+          }
+        })
+        .catch(err => {
+          console.error('Google connect error:', err)
+          toast.error(err.response?.data?.message || 'Failed to initialize Google login')
+          setConnecting(null)
+        })
+    } else if (platform === 'google_ads') {
+      axios.get(`/api/social/google-ads/url`)
+        .then(res => {
+          if (res.data?.url) {
+            window.location.href = res.data.url
+          } else {
+            toast.error('Could not generate Google Ads login URL')
+            setConnecting(null)
+          }
+        })
+        .catch(err => {
+          console.error('Google Ads connect error:', err)
+          toast.error(err.response?.data?.message || 'Failed to initialize Google Ads login')
           setConnecting(null)
         })
     } else {
@@ -501,8 +616,9 @@ export default function ConnectedAccounts() {
   const [connectModalOpen, setConnectModalOpen] = useState(false)
   const [disconnectTarget, setDisconnectTarget] = useState(null)
   const [settingsTarget, setSettingsTarget] = useState(null)
-  const [selectMetaKey, setSelectMetaKey] = useState(null)
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
+  const [selectMetaKey, setSelectMetaKey] = useState(searchParams.get('select_meta'))
+  const [selectGoogleKey, setSelectGoogleKey] = useState(searchParams.get('select_google'))
 
   useEffect(() => {
     // Check for OAuth callbacks
@@ -646,6 +762,13 @@ export default function ConnectedAccounts() {
         metaKey={selectMetaKey} 
         onClose={() => setSelectMetaKey(null)} 
         onConfirm={() => { setSelectMetaKey(null); fetchAccounts(); }} 
+      />
+
+      {/* Select Google Accounts Modal */}
+      <SelectGoogleAccountsModal 
+        googleKey={selectGoogleKey} 
+        onClose={() => setSelectGoogleKey(null)} 
+        onConfirm={() => { setSelectGoogleKey(null); fetchAccounts(); }} 
       />
 
       {/* Disconnect Confirm Modal */}
